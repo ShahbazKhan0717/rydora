@@ -4,9 +4,12 @@ import 'package:go_router/go_router.dart';
 import '../core/constants/app_routes.dart';
 import '../features/authentication/presentation/login_screen.dart';
 import '../features/authentication/presentation/register_screen.dart';
+import '../features/driver/presentation/driver_home_screen.dart';
+import '../features/driver/presentation/driver_setup_screen.dart';
 import '../features/onboarding/presentation/onboarding_screen.dart';
 import '../features/onboarding/presentation/splash_screen.dart';
 import '../features/passenger/presentation/passenger_home_screen.dart';
+import '../features/profile/application/mode_providers.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -31,6 +34,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.passengerHome,
         builder: (context, state) => const PassengerHomeScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.driverHome,
+        // UI guard only. Firestore rules enforce this for real later.
+        redirect: (context, state) => ref.read(driverSetupProvider) == null
+            ? AppRoutes.driverSetup
+            : null,
+        builder: (context, state) => const DriverHomeScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.driverSetup,
+        builder: (context, state) => const DriverSetupScreen(),
       ),
     ],
   );
