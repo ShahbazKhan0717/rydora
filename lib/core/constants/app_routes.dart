@@ -8,4 +8,7 @@ class AppRoutes {
   static const String passengerHome = '/passenger';
   static const String driverHome = '/driver';
   static const String driverSetup = '/driver/setup';
+  static const String editProfile = '/profile/edit';
+  static const String settings = '/settings';
+  static const String help = '/help';
 }
