@@ -22,7 +22,7 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     _timer = Timer(const Duration(seconds: 2), () {
-      if (mounted) context.go(AppRoutes.welcome);
+      if (mounted) context.go(AppRoutes.onboarding);
     });
   }
 
