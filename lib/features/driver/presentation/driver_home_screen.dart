@@ -1,33 +1,104 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/constants/app_routes.dart';
+import '../../../core/errors/app_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/utils/snack.dart';
 import '../../../core/widgets/empty_state.dart';
-import '../../profile/application/mode_providers.dart';
+import '../../../core/widgets/rydora_button.dart';
+import '../../../data/models/driver_profile.dart';
+import '../../../data/providers.dart';
 import '../../profile/presentation/profile_tab.dart';
 import '../../profile/presentation/widgets/mode_switch_card.dart';
 
-class DriverHomeScreen extends StatefulWidget {
+class DriverHomeScreen extends ConsumerWidget {
   const DriverHomeScreen({super.key});
 
   @override
-  State<DriverHomeScreen> createState() => _DriverHomeScreenState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(driverProfileProvider);
+    return profile.when(
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (e, st) => const Scaffold(
+        body: SafeArea(
+          child: EmptyState(
+            icon: Icons.error_outline,
+            title: 'Something went wrong',
+            message:
+                'Could not load your driver profile. Check your connection.',
+          ),
+        ),
+      ),
+      data: (p) => p == null ? const _NeedsSetup() : _DriverShell(profile: p),
+    );
+  }
 }
 
-class _DriverHomeScreenState extends State<DriverHomeScreen> {
-  int _tab = 0;
+class _NeedsSetup extends StatelessWidget {
+  const _NeedsSetup();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            children: [
+              const Expanded(
+                child: EmptyState(
+                  icon: Icons.drive_eta,
+                  title: 'Driver Mode is not set up',
+                  message: 'Add your vehicle details to start driving.',
+                ),
+              ),
+              RydoraButton(
+                label: 'Set up Driver Mode',
+                onPressed: () => context.go(AppRoutes.driverSetup),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DriverShell extends StatefulWidget {
+  const _DriverShell({required this.profile});
+
+  final DriverProfile profile;
+
+  @override
+  State<_DriverShell> createState() => _DriverShellState();
+}
+
+class _DriverShellState extends State<_DriverShell> {
+  int _tab = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.profile;
+    return Scaffold(
+      body: SafeArea(
         child: IndexedStack(
           index: _tab,
-          children: const [
-            _DashboardTab(),
-            _RequestsTab(),
-            ProfileTab(isDriver: true),
+          children: [
+            _DashboardTab(profile: p),
+            EmptyState(
+              icon: p.isOnline
+                  ? Icons.hourglass_empty
+                  : Icons.power_settings_new,
+              title: p.isOnline ? 'No requests yet' : 'You are offline',
+              message: p.isOnline
+                  ? 'Passenger requests arrive in Phase 6.'
+                  : 'Go online on the Dashboard to see requests.',
+            ),
+            const ProfileTab(isDriver: true),
           ],
         ),
       ),
@@ -51,13 +122,22 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 }
 
 class _DashboardTab extends ConsumerWidget {
-  const _DashboardTab();
+  const _DashboardTab({required this.profile});
+
+  final DriverProfile profile;
+
+  Future<void> _toggle(BuildContext context, WidgetRef ref, bool value) async {
+    try {
+      await ref.read(driverRepositoryProvider).setOnline(profile.uid, value);
+    } on AppException catch (e) {
+      if (context.mounted) showSnack(context, e.message);
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
-    final online = ref.watch(driverOnlineProvider);
-
+    final online = profile.isOnline;
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.lg),
       children: [
@@ -79,18 +159,17 @@ class _DashboardTab extends ConsumerWidget {
                   : 'Go online to receive ride requests.',
             ),
             value: online,
-            onChanged: (v) =>
-                ref.read(driverOnlineProvider.notifier).setOnline(v),
+            onChanged: (v) => _toggle(context, ref, v),
           ),
         ),
         const SizedBox(height: AppSpacing.md),
-        Row(
+        const Row(
           children: [
-            const Expanded(
+            Expanded(
               child: _StatCard(label: 'Today (demo)', value: 'Rs 0'),
             ),
-            const SizedBox(width: AppSpacing.md),
-            const Expanded(
+            SizedBox(width: AppSpacing.md),
+            Expanded(
               child: _StatCard(label: 'Trips', value: '0'),
             ),
           ],
@@ -129,22 +208,6 @@ class _StatCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _RequestsTab extends ConsumerWidget {
-  const _RequestsTab();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final online = ref.watch(driverOnlineProvider);
-    return EmptyState(
-      icon: online ? Icons.hourglass_empty : Icons.power_settings_new,
-      title: online ? 'No requests yet' : 'You are offline',
-      message: online
-          ? 'Passenger requests arrive in Phase 6.'
-          : 'Go online on the Dashboard to see requests.',
     );
   }
 }

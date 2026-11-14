@@ -4,24 +4,38 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/utils/snack.dart';
+import '../../../../data/providers.dart';
 import '../../application/mode_providers.dart';
 
 class ModeSwitchCard extends ConsumerWidget {
   const ModeSwitchCard({super.key});
 
-  void _onChanged(BuildContext context, WidgetRef ref, AppMode target) {
+  Future<void> _onChanged(
+    BuildContext context,
+    WidgetRef ref,
+    AppMode target,
+  ) async {
     final notifier = ref.read(appModeProvider.notifier);
     if (target == AppMode.passenger) {
       notifier.setMode(AppMode.passenger);
       context.go(AppRoutes.passengerHome);
       return;
     }
-    if (ref.read(driverSetupProvider) == null) {
-      context.go(AppRoutes.driverSetup);
-      return;
+    try {
+      final profile = await ref.read(driverProfileProvider.future);
+      if (!context.mounted) return;
+      if (profile == null) {
+        context.go(AppRoutes.driverSetup);
+        return;
+      }
+      notifier.setMode(AppMode.driver);
+      context.go(AppRoutes.driverHome);
+    } catch (_) {
+      if (context.mounted) {
+        showSnack(context, 'Could not check your driver profile. Try again.');
+      }
     }
-    notifier.setMode(AppMode.driver);
-    context.go(AppRoutes.driverHome);
   }
 
   @override

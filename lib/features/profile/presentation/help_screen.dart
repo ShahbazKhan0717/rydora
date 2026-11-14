@@ -27,8 +27,7 @@ const _faqs = [
   ),
   _Faq(
     'Is my data saved?',
-    'Not yet. Until Firebase is connected, profile and driver details are '
-        'kept in memory and reset when you log out.',
+    'Yes. Your profile and driver details are stored securely in your account.',
   ),
 ];
 

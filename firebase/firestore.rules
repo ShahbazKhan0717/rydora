@@ -1,0 +1,55 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function validName(v) {
+      return v is string && v.size() > 0 && v.size() <= 80;
+    }
+
+    // users/{uid}: private profile, only the owner can read or edit it.
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['name', 'email', 'phone', 'createdAt'])
+        && request.resource.data.keys().hasAll(['name', 'email', 'phone', 'createdAt'])
+        && validName(request.resource.data.name)
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.phone is string
+        && request.resource.data.phone.size() <= 20
+        && request.resource.data.createdAt == request.time;
+      allow update: if isOwner(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'phone', 'updatedAt'])
+        && validName(request.resource.data.name)
+        && request.resource.data.phone is string
+        && request.resource.data.phone.size() <= 20
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+
+    // driver_profiles/{uid}: vehicle + availability, owner only for now.
+    // Ride/offer collections and limited passenger reads arrive in Phases 5-7.
+    match /driver_profiles/{uid} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['vehicleType', 'model', 'plate', 'isOnline', 'createdAt', 'updatedAt'])
+        && request.resource.data.keys().hasAll(['vehicleType', 'model', 'plate', 'isOnline', 'createdAt', 'updatedAt'])
+        && request.resource.data.vehicleType in ['car', 'bike']
+        && request.resource.data.model is string
+        && request.resource.data.model.size() > 0 && request.resource.data.model.size() <= 60
+        && request.resource.data.plate is string
+        && request.resource.data.plate.size() > 0 && request.resource.data.plate.size() <= 20
+        && request.resource.data.isOnline == false
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow update: if isOwner(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isOnline', 'updatedAt'])
+        && request.resource.data.isOnline is bool
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+  }
+}

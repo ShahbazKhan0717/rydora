@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/errors/app_exception.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/utils/snack.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/widgets/rydora_button.dart';
 import '../../../core/widgets/rydora_text_field.dart';
-import '../application/profile_providers.dart';
+import '../../../data/providers.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -19,13 +21,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _name;
   late final TextEditingController _phone;
+  bool _loading = false;
 
   @override
   void initState() {
     super.initState();
-    final profile = ref.read(userProfileProvider);
-    _name = TextEditingController(text: profile.name);
-    _phone = TextEditingController(text: profile.phone);
+    final user = ref.read(currentUserProvider).value;
+    _name = TextEditingController(text: user?.name ?? '');
+    _phone = TextEditingController(text: user?.phone ?? '');
   }
 
   @override
@@ -35,15 +38,32 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    ref
-        .read(userProfileProvider.notifier)
-        .update(name: _name.text, phone: _phone.text);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Profile updated')));
-    context.pop();
+    final authUser = ref.read(authStateProvider).value;
+    if (authUser == null) return;
+    setState(() => _loading = true);
+    try {
+      final repo = ref.read(userRepositoryProvider);
+      await repo.ensureProfile(
+        uid: authUser.uid,
+        email: authUser.email ?? '',
+        name: _name.text,
+        phone: _phone.text,
+      );
+      await repo.updateProfile(
+        uid: authUser.uid,
+        name: _name.text,
+        phone: _phone.text,
+      );
+      if (!mounted) return;
+      showSnack(context, 'Profile updated');
+      context.pop();
+    } on AppException catch (e) {
+      if (mounted) showSnack(context, e.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -75,7 +95,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   textInputAction: TextInputAction.done,
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                RydoraButton(label: 'Save changes', onPressed: _save),
+                RydoraButton(
+                  label: 'Save changes',
+                  isLoading: _loading,
+                  onPressed: _save,
+                ),
               ],
             ),
           ),

@@ -3,12 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_routes.dart';
+import '../../../core/errors/app_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/utils/snack.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/widgets/rydora_button.dart';
 import '../../../core/widgets/rydora_text_field.dart';
 import '../../../data/models/vehicle_type.dart';
+import '../../../data/providers.dart';
 import '../../profile/application/mode_providers.dart';
 
 class DriverSetupScreen extends ConsumerStatefulWidget {
@@ -23,6 +26,7 @@ class _DriverSetupScreenState extends ConsumerState<DriverSetupScreen> {
   final _model = TextEditingController();
   final _plate = TextEditingController();
   VehicleType _type = VehicleType.car;
+  bool _loading = false;
 
   @override
   void dispose() {
@@ -31,19 +35,27 @@ class _DriverSetupScreenState extends ConsumerState<DriverSetupScreen> {
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    ref
-        .read(driverSetupProvider.notifier)
-        .save(
-          DriverSetup(
+    final uid = ref.read(authStateProvider).value?.uid;
+    if (uid == null) return;
+    setState(() => _loading = true);
+    try {
+      await ref
+          .read(driverRepositoryProvider)
+          .createProfile(
+            uid: uid,
             vehicleType: _type,
-            model: _model.text.trim(),
+            model: _model.text,
             plate: _plate.text.trim().toUpperCase(),
-          ),
-        );
-    ref.read(appModeProvider.notifier).setMode(AppMode.driver);
-    context.go(AppRoutes.driverHome);
+          );
+      ref.read(appModeProvider.notifier).setMode(AppMode.driver);
+      if (mounted) context.go(AppRoutes.driverHome);
+    } on AppException catch (e) {
+      if (mounted) showSnack(context, e.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -119,7 +131,11 @@ class _DriverSetupScreenState extends ConsumerState<DriverSetupScreen> {
                   textInputAction: TextInputAction.done,
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                RydoraButton(label: 'Save and continue', onPressed: _save),
+                RydoraButton(
+                  label: 'Save and continue',
+                  isLoading: _loading,
+                  onPressed: _save,
+                ),
               ],
             ),
           ),

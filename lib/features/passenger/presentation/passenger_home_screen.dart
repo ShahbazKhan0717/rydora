@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../data/providers.dart';
 import '../../profile/presentation/profile_tab.dart';
 import '../../profile/presentation/widgets/mode_switch_card.dart';
 
@@ -49,17 +51,18 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
   }
 }
 
-class _PassengerHomeTab extends StatelessWidget {
+class _PassengerHomeTab extends ConsumerWidget {
   const _PassengerHomeTab();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
+    final name = ref.watch(currentUserProvider).value?.name ?? 'there';
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.lg),
       children: [
         Text(
-          'Hello, Passenger',
+          'Hello, $name',
           style: textTheme.headlineMedium?.copyWith(
             fontWeight: FontWeight.w800,
           ),
